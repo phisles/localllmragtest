@@ -24,15 +24,15 @@ def __pull_model(name: str) -> None:
         current_digest = digest
 
 
-def __is_model_available_locally(model_name: str) -> bool:
+def __is_model_available_locally(llama3: str) -> bool:
     try:
-        ollama.show(model_name)
+        ollama.show(llama3)
         return True
     except ollama.ResponseError:
         return False
 
 
-def check_if_model_is_available(model_name: str) -> None:
+def check_if_model_is_available(llama3: str) -> None:
     """
     Ensures that the specified model is available locally.
     If the model is not available, it attempts to pull it from the Ollama repository.
@@ -44,14 +44,14 @@ def check_if_model_is_available(model_name: str) -> None:
         ollama.ResponseError: If there is an issue with pulling the model from the repository.
     """
     try:
-        available = __is_model_available_locally(model_name)
+        available = __is_model_available_locally(llama3)
     except Exception:
         raise Exception("Unable to communicate with the Ollama service")
 
     if not available:
         try:
-            __pull_model(model_name)
+            __pull_model(llama3)
         except Exception:
             raise Exception(
-                f"Unable to find model '{model_name}', please check the name and try again."
+                f"Unable to find model '{llama3}', please check the name and try again."
             )
