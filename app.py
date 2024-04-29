@@ -10,6 +10,7 @@ import sys
 
 from llm import getChatChain
 
+import logging
 
 TEXT_SPLITTER = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=100)
 
@@ -23,16 +24,71 @@ def load_documents_into_database(model_name: str, documents_path: str) -> Chroma
         Chroma: The Chroma database with loaded documents.
     """
 
+    import os
+    from PyPDF2 import PdfReader
+    import mimetypes
+
+    def load_text_document(path):
+        try:
+            with open(path, 'r', encoding='utf-8') as file:
+                text = file.read()
+            return text
+        except Exception as e:
+            logging.error(f"Error reading text document at {path}: {e}")
+            return None
+
+    def load_pdf_document(path):
+        try:
+            reader = PdfReader(path)
+            text = ' '.join([page.extract_text() for page in reader.pages if page.extract_text() is not None])
+            return text
+        except Exception as e:
+            logging.error(f"Error reading PDF document at {path}: {e}")
+            return None
+
+    def load_documents(directory):
+        documents = []
+        for filename in os.listdir(directory):
+            filepath = os.path.join(directory, filename)
+            if os.path.isfile(filepath):
+                mimetype, _ = mimetypes.guess_type(filepath)
+                if mimetype == 'application/pdf':
+                    text = load_pdf_document(filepath)
+                elif mimetype and mimetype.startswith('text'):
+                    text = load_text_document(filepath)
+                else:
+                    logging.warning(f"Ignored file '{filename}' as it is not a supported format.")
+                    continue
+                
+                if text:
+                    documents.append({'filename': filename, 'content': text})
+            else:
+                logging.warning(f"Ignored non-file entry '{filename}'.")
+        return documents
+
     print("Loading documents")
     raw_documents = load_documents(documents_path)
+    if not raw_documents:
+        raise ValueError("No documents loaded. Check the documents path and format.")
+
     documents = TEXT_SPLITTER.split_documents(raw_documents)
+    if not documents:
+        raise ValueError("Document splitting resulted in no output. Check the splitter and input documents.")
 
     print("Creating embeddings and loading documents into Chroma")
-    db = Chroma.from_documents(
-        documents,
-        OllamaEmbeddings(model=model_name),
-    )
+    try:
+        db = Chroma.from_documents(
+            documents,
+            OllamaEmbeddings(model=model_name),
+        )
+    except Exception as e:
+        print(f"Failed to load documents into Chroma: {e}")
+        raise
+
     return db
+
+
+
 
 
 def main(llm_model_name: str, embedding_model_name: str, documents_path: str) -> None:

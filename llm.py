@@ -8,6 +8,10 @@ from langchain_core.messages import get_buffer_string
 from langchain_core.prompts import format_document
 from langchain.prompts.prompt import PromptTemplate
 
+import logging
+from time import time, sleep
+
+logging.basicConfig(filename='program.log', level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 condense_question = """Given the following conversation and a follow up question, rephrase the follow up question to be a standalone question.
 
@@ -47,6 +51,9 @@ def _combine_documents(
 memory = ConversationBufferMemory(
     return_messages=True, output_key="answer", input_key="question"
 )
+
+
+# Configure logging
 
 
 def getChatChain(llm, db):
@@ -89,8 +96,12 @@ def getChatChain(llm, db):
     final_chain = loaded_memory | standalone_question | retrieved_documents | answer
 
     def chat(question: str):
+        start_time = time()  # Start measuring execution time
         inputs = {"question": question}
         result = final_chain.invoke(inputs)
         memory.save_context(inputs, {"answer": result["answer"]})
+        end_time = time()  # End measuring execution time
+        processing_time = end_time - start_time
+        logging.info(f"Processing time for question '{question}': {processing_time} seconds")
 
     return chat

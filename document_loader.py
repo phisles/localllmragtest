@@ -8,45 +8,42 @@ from typing import List
 from langchain_core.documents import Document
 
 
-def load_documents(path: str) -> List[Document]:
-    """
-    Loads documents from the specified directory path.
+import os
+from PyPDF2 import PdfReader
+import logging
 
-    This function supports loading of PDF, Markdown, and HTML documents by utilizing
-    different loaders for each file type. It checks if the provided path exists and
-    raises a FileNotFoundError if it does not. It then iterates over the supported
-    file types and uses the corresponding loader to load the documents into a list.
+def load_documents(directory):
+    documents = []
+    for filename in os.listdir(directory):
+        if filename.endswith('.pdf'):
+            path = os.path.join(directory, filename)
+            text = load_pdf_document(path)
+            if text:
+                documents.append({'filename': filename, 'content': text})
+        elif filename.endswith('.txt') or filename.endswith('.md'):
+            path = os.path.join(directory, filename)
+            text = load_text_document(path)
+            if text:
+                documents.append({'filename': filename, 'content': text})
+        else:
+            logging.warning(f"Ignored file '{filename}' as it is not a supported format.")
+    return documents
 
-    Args:
-        path (str): The path to the directory containing documents to load.
+def load_text_document(path):
+    try:
+        with open(path, 'r', encoding='utf-8') as file:
+            text = file.read()
+        return text
+    except Exception as e:
+        logging.error(f"Error reading text document at {path}: {e}")
+        return None
 
-    Returns:
-        List[Document]: A list of loaded documents.
+def load_pdf_document(path):
+    try:
+        reader = PdfReader(path)
+        text = ' '.join([page.extract_text() for page in reader.pages if page.extract_text() is not None])
+        return text
+    except Exception as e:
+        logging.error(f"Error reading PDF document at {path}: {e}")
+        return None
 
-    Raises:
-        FileNotFoundError: If the specified path does not exist.
-    """
-    if not os.path.exists(path):
-        raise FileNotFoundError(f"The specified path does not exist: {path}")
-
-    loaders = {
-        ".pdf": DirectoryLoader(
-            path,
-            glob="**/*.pdf",
-            loader_cls=PyPDFLoader,
-            show_progress=True,
-            use_multithreading=True,
-        ),
-        ".md": DirectoryLoader(
-            path,
-            glob="**/*.md",
-            loader_cls=TextLoader,
-            show_progress=True,
-        ),
-    }
-
-    docs = []
-    for file_type, loader in loaders.items():
-        print(f"Loading {file_type} files")
-        docs.extend(loader.load())
-    return docs
